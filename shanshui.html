@@ -1,0 +1,432 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+  <title>Shan Shui - Infinite Chinese Landscape</title>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+  <!-- Core Utilities Layer -->
+  <script src="js/prng.js"></script>
+  <script src="js/noise.js"></script>
+  <script src="js/polytools.js"></script>
+  <script src="js/utils.js"></script>
+
+  <!-- Rendering Layer -->
+  <script src="js/rendering.js"></script>
+
+  <!-- Generator Layer -->
+  <script src="js/trees.js"></script>
+  <script src="js/mountains.js"></script>
+  <script src="js/architecture.js"></script>
+  <script src="js/figures.js"></script>
+  <script src="js/water.js"></script>
+
+  <!-- Application Layer -->
+  <script src="js/display.js"></script>
+  <script src="js/main.js"></script>
+
+  <!-- Global Variables and Initialization -->
+  <script>
+    // Global variables needed by HTML elements
+    var btnHoverCol = "rgba(0,0,0,0.1)";
+
+    // Initialize seed and parse URL parameters
+    var SEED = "" + new Date().getTime();
+    parseArgs({
+      seed: function (x) {
+        SEED = x == "" ? SEED : x;
+      },
+    });
+    Math.seed(SEED);
+    console.log(Prng.seed);
+  </script>
+</head>
+
+<body style="margin:0">
+  <div id="SETTING" style="
+    position:fixed; 
+    z-index:1000; 
+    left: 40; 
+    top: 3;
+    ">
+    <div id="SET_BTN" style="
+      width:32;
+      height:32;
+      color:rgba(0,0,0,0.4);
+      border: 1px solid rgba(0,0,0,0.4);
+      text-align: center;
+      display: table;
+      cursor: pointer;
+      " onmouseover="document.getElementById('SET_BTN').style.backgroundColor=btnHoverCol"
+      onmouseout="document.getElementById('SET_BTN').style.backgroundColor='rgba(0,0,0,0)'"
+      onclick="toggleVisible('MENU');toggleText('SET_BTN.t','&#x2630;','&#x2715;')" title="Settings">
+      <div style="display:table-cell; vertical-align: middle;">
+        <font id="SET_BTN.t" size="4px"> &#x2630; </font>
+      </div>
+      <script>
+        window.addEventListener("scroll", function (e) {
+          document.getElementById("SETTING").style.left = Math.max(
+            4,
+            40 - window.scrollX
+          );
+        });
+      </script>
+    </div>
+    <div style="height:4px"></div>
+    <div id="MENU" style="
+      display:none;
+      background-color: rgba(0,0,0,0.1);
+      border: 1px solid rgba(0,0,0,0.4);
+      ">
+      <table>
+        <tr>
+          <td>
+            <pre>SEED</pre>
+          </td>
+        </tr>
+        <tr>
+          <td>
+            <input title="random seed" id="INP_SEED" placeholder="Leave empty for random" />
+            <button onclick="reloadWSeed(document.getElementById('INP_SEED').value)"
+              title="Generate new landscape with seed (leave empty for random)">
+              Generate
+            </button>
+          </td>
+        </tr>
+        <tr>
+          <td>
+            <pre>VIEW</pre>
+          </td>
+        </tr>
+        <tr>
+          <td>
+            <button title="view left" onclick="xcroll(-parseFloat(document.getElementById('INC_STEP').value))">
+              < </button>
+                <input title="increment step" id="INC_STEP" type="number" value="200" min="0" max="10000" step="20" />
+                <button title="view right" onclick="xcroll(parseFloat(document.getElementById('INC_STEP').value))">
+                  >
+                </button>
+          </td>
+        </tr>
+
+        <tr>
+          <td>
+            <pre><input id = "AUTO_SCROLL" type="checkbox" checked
+            onchange="autoxcroll(parseFloat(document.getElementById('INC_STEP').value))">Auto-scroll</pre>
+          </td>
+        </tr>
+
+        <tr>
+          <td>
+            <pre>DIRECTION</pre>
+          </td>
+        </tr>
+        <tr>
+          <td>
+            <label style="font-size: 12px; margin-right: 10px;">
+              <input type="radio" id="SCROLL_RIGHT" name="scroll_direction" value="right" checked>
+              Right →
+            </label>
+            <label style="font-size: 12px;">
+              <input type="radio" id="SCROLL_LEFT" name="scroll_direction" value="left">
+              ← Left
+            </label>
+          </td>
+        </tr>
+
+        <tr>
+          <td>
+            <pre>ELEMENTS</pre>
+          </td>
+        </tr>
+        <tr>
+          <td>
+            <label style="font-size: 11px; display: block; margin: 2px 0;">
+              <input type="checkbox" id="ENABLE_TREES" checked> � Tre️es
+            </label>
+            <label style="font-size: 11px; display: block; margin: 2px 0;">
+              <input type="checkbox" id="ENABLE_BUILDINGS" checked> � Buildings
+            </label>
+            <label style="font-size: 11px; display: block; margin: 2px 0;">
+              <input type="checkbox" id="ENABLE_BOATS" checked> ⛵ Boats
+            </label>
+            <label style="font-size: 11px; display: block; margin: 2px 0;">
+              <input type="checkbox" id="ENABLE_WATER" checked> 💧 Water
+            </label>
+          </td>
+        </tr>
+        <tr>
+          <td>
+            <pre>STYLE</pre>
+          </td>
+        </tr>
+        <tr>
+          <td>
+            <label style="font-size: 11px; display: block; margin: 2px 0;">
+              <input type="checkbox" id="BROKEN_STROKES"> 🖌️ Broken Strokes
+            </label>
+          </td>
+        </tr>
+        <tr>
+          <td>
+            <button onclick="regenerateLandscape()" style="font-size: 11px; padding: 4px 8px;">
+              🔄 Apply Changes
+            </button>
+          </td>
+        </tr>
+
+        <tr>
+          <td>
+            <pre>SAVE</pre>
+          </td>
+        </tr>
+        <tr>
+          <td>
+            <button title="WARNING: This may take a while..." type="button" id="dwn-btn" value="Download as SVG"
+              onclick="download(''+(Math.random())+'.svg', document.getElementById('BG').innerHTML);">
+              Download as .SVG
+            </button>
+          </td>
+        </tr>
+      </table>
+    </div>
+  </div>
+
+
+
+  <!-- Main landscape container with navigation -->
+  <div style="
+    display: flex;
+    align-items: stretch;
+    min-height: 100vh;
+    border-bottom: 1px solid rgba(0,0,0,0.1);
+  ">
+    <!-- Left navigation button -->
+    <div id="L" onmouseover="rstyle('L',true)" onmouseout="rstyle('L',false)" onclick="xcroll(-200)" style="
+           width: 40px;
+           display: flex;
+           align-items: center;
+           justify-content: center;
+           cursor: pointer;
+           border: 1px solid rgba(0,0,0,0.4);
+           color: rgba(0,0,0,0.4);
+           background-color: rgba(0,0,0,0);
+           user-select: none;
+         ">
+      <div id="L.t">
+        <font size="6px">&#x3008;</font>
+      </div>
+    </div>
+
+    <!-- Main landscape area -->
+    <div id="BG" style="flex: 1;">
+      <script>
+        function initializeLandscape() {
+          console.log("BG initialization starting...");
+
+          try {
+            // Initialize application inline to ensure proper timing
+            MEM.lasttick = new Date().getTime();
+
+            // Set seed input value if element exists
+            var seedInput = document.getElementById("INP_SEED");
+            if (seedInput) {
+              seedInput.value = SEED;
+            }
+
+            // Set BG element style if element exists
+            var bgElement = document.getElementById("BG");
+            if (bgElement) {
+              bgElement.setAttribute("style", "width:" + MEM.windx + "px; flex: 1;");
+            }
+
+            console.log("MEM initialized, windx:", MEM.windx, "windy:", MEM.windy);
+            console.log("MEM state:", { xmin: MEM.xmin, xmax: MEM.xmax, cursx: MEM.cursx });
+
+            // Initialize navigation button styles
+            rstyle("L", false);
+            rstyle("R", false);
+
+            // Initialize element toggles
+            if (typeof initElementToggles === 'function') {
+              initElementToggles();
+              console.log("Element toggles initialized");
+            } else {
+              console.warn("initElementToggles function not available");
+            }
+
+            // Force initial chunk generation
+            console.log("Force generating initial chunks...");
+
+            // Reset chunk state to ensure clean start
+            MEM.chunks = [];
+            MEM.canv = "";
+
+            // Generate chunks for initial view
+            var xmin = MEM.cursx;
+            var xmax = MEM.cursx + MEM.windx;
+            console.log("Generating chunks for range:", xmin, "to", xmax);
+
+            chunkloader(xmin, xmax);
+            console.log("Chunkloader completed, chunks:", MEM.chunks.length);
+
+            chunkrender(xmin, xmax);
+            console.log("Chunkrender completed, canvas length:", MEM.canv.length);
+
+            // Update the display
+            var bgElement = document.getElementById("BG");
+            if (bgElement) {
+              if (MEM.canv.length > 0) {
+                bgElement.innerHTML =
+                  "<svg id='SVG' xmlns='http://www.w3.org/2000/svg' width='" +
+                  MEM.windx +
+                  "' height='" +
+                  MEM.windy +
+                  "' style='mix-blend-mode:multiply;'" +
+                  "viewBox = '" +
+                  calcViewBox() +
+                  "'" +
+                  "><g id='G' transform='translate(" +
+                  0 +
+                  ",0)'>" +
+                  MEM.canv +
+                  "</g></svg>";
+                console.log("BG element updated with SVG content");
+              } else {
+                console.error("No canvas content generated!");
+                // Show a message to the user
+                bgElement.innerHTML =
+                  "<div style='padding: 50px; text-align: center; color: #666;'>" +
+                  "<h3>Landscape Generation Issue</h3>" +
+                  "<p>No landscape was generated on initial load.</p>" +
+                  "<p>Try clicking the left (&lt;) or right (&gt;) navigation buttons to generate content.</p>" +
+                  "</div>";
+              }
+            } else {
+              console.error("BG element not found!");
+            }
+
+            document.body.scrollTo(0, 0);
+            console.log("Scroll position reset");
+
+            console.log("Calling present()...");
+            present();
+
+            console.log("BG initialization completed!");
+
+            // Start auto-scroll after successful initialization
+            setTimeout(function () {
+              startAutoScroll();
+            }, 2000); // Wait 2 seconds after initialization
+
+          } catch (error) {
+            console.error("Error in BG initialization:", error);
+            var bgElement = document.getElementById("BG");
+            if (bgElement) {
+              bgElement.innerHTML =
+                "<div style='padding: 50px; text-align: center; color: #f00;'>" +
+                "<h3>Initialization Error</h3>" +
+                "<p>Error: " + error.message + "</p>" +
+                "<p>Check the browser console for more details.</p>" +
+                "</div>";
+            }
+          }
+        }
+
+        // Wait for DOM to be fully loaded before initializing
+        if (document.readyState === 'loading') {
+          document.addEventListener('DOMContentLoaded', initializeLandscape);
+        } else {
+          // DOM is already loaded
+          setTimeout(initializeLandscape, 100);
+        }
+
+        // Fallback initialization after a longer delay
+        setTimeout(function () {
+          if (typeof MEM !== 'undefined' && MEM.canv.length === 0) {
+            console.log("Fallback initialization triggered");
+            initializeLandscape();
+          }
+        }, 1000);
+      </script>
+    </div>
+
+    <!-- Right navigation button -->
+    <div id="R" onmouseover="rstyle('R',true)" onmouseout="rstyle('R',false)" onclick="xcroll(200)" style="
+           width: 40px;
+           display: flex;
+           align-items: center;
+           justify-content: center;
+           cursor: pointer;
+           border: 1px solid rgba(0,0,0,0.4);
+           color: rgba(0,0,0,0.4);
+           background-color: rgba(0,0,0,0);
+           user-select: none;
+         ">
+      <div id="R.t">
+        <font size="6px">&#x3009;</font>
+      </div>
+    </div>
+  </div>
+
+  <canvas id="bgcanv" width="512" height="512" hidden> </canvas>
+
+  <!-- Background Texture Generation - Must run after BG initialization -->
+  <script>
+    // Wait for BG initialization to complete, then generate background texture
+    setTimeout(function () {
+      var canvas = document.getElementById("bgcanv");
+      var ctx = canvas.getContext("2d");
+      var reso = 512;
+
+      for (var i = 0; i < reso / 2 + 1; i++) {
+        for (var j = 0; j < reso / 2 + 1; j++) {
+          var c = 245 + Noise.noise(i * 0.1, j * 0.1) * 10;
+          c -= Math.random() * 20;
+
+          var r = c.toFixed(0);
+          var g = (c * 0.95).toFixed(0);
+          var b = (c * 0.85).toFixed(0);
+          ctx.fillStyle = "rgb(" + r + "," + g + "," + b + ")";
+          ctx.fillRect(i, j, 1, 1);
+          ctx.fillRect(reso - i, j, 1, 1);
+          ctx.fillRect(i, reso - j, 1, 1);
+          ctx.fillRect(reso - i, reso - j, 1, 1);
+        }
+      }
+      var img = canvas.toDataURL("image/png");
+      // Only set background image on body, not on BG element which contains the SVG
+      document.getElementsByTagName("body")[0].style.backgroundImage = "url(" + img + ")";
+    }, 100);
+
+    /**
+     * Start auto-scroll functionality automatically
+     */
+    function startAutoScroll() {
+      console.log("Starting auto-scroll...");
+
+      // Check if auto-scroll checkbox exists and enable it
+      var autoScrollCheckbox = document.getElementById("AUTO_SCROLL");
+      if (autoScrollCheckbox) {
+        autoScrollCheckbox.checked = true;
+        console.log("Auto-scroll checkbox enabled");
+      }
+
+      // Get the scroll step value
+      var stepInput = document.getElementById("INC_STEP");
+      var scrollStep = stepInput ? parseFloat(stepInput.value) : 200;
+
+      // Start the auto-scroll with the current step value
+      if (typeof autoxcroll === 'function') {
+        autoxcroll(scrollStep);
+        console.log("Auto-scroll started with step:", scrollStep);
+      } else {
+        console.warn("autoxcroll function not available");
+      }
+    }
+  </script>
+
+</body>
+
+</html>

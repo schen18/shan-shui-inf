@@ -1,9 +1,10 @@
-# {Shan, Shui}*
-Procedurally-generated vector-format infinitely-scrolling Chinese landscape for the browser.
-Generate your own on https://lingdong-.github.io/shan-shui-inf/ (or [Alternative link](https://shan-shui-inf.glitch.me)).
+LingDong's original https://github.com/LingDong-/shan-shui-inf was so breathtaking that others have tried their own spin on it. However those typically amounted to porting the code into another framework like React, Node etc. instead of adding anything new or contributing to deeper understanding of how LingDong created such a miracle in raw Javascript.
 
-Some examples:
-![Screenshot1](/screenshots/screen001.jpg?raw=true "")
-![Screenshot2](/screenshots/screen002.jpg?raw=true "")
+This repo focuses on refactoring LingDong's original monolithic code into constitutent modules, including JSdocs and READMEs for each module to facilitate understanding and improvements.
+Using this as a base, improvementws were made to LingDong's original.
 
-{Shan, Shui}\* is inspired by [traditional Chinese landscape scrolls](https://en.wikipedia.org/wiki/Shan_shui) (such as [this](https://en.wikipedia.org/wiki/Dwelling_in_the_Fuchun_Mountains) and [this](https://en.wikipedia.org/wiki/Wang_Ximeng)) and uses noises and mathematical functions to model the mountains and trees from scratch. It is written entirely in javascript and outputs Scalable Vector Graphics (SVG) format.
+1. Autoscroll "infinitely" on load (vs needing manual toggle)
+2. Add ability to toggling scroll direction from L-R / R-L 
+3. Add ability to toggle elements (Trees, Buildings, Boats, People) to include/exclude from painting
+4. Addded "Broken Strokes" toggle that randomly breaks stroke paths of Mountains, Water, Boats to mimic brush stroke aesthetics
+
