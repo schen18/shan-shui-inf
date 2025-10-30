@@ -8,3 +8,5 @@ Using this as a base, improvements were made to LingDong's original.
 3. Add ability to toggle elements (Trees, Buildings, Boats, People) to include/exclude from painting
 4. Addded "Broken Strokes" toggle that randomly breaks stroke paths of Mountains, Water, Boats to mimic brush stroke aesthetics
 
+Created an Interactive version by porting to Paper.JS framework. 
+papershanshui.html uses mouse wheel scroll to pan left / right. It also has more dramatic broken stroke rendering for mountains and terrain
