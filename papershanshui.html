@@ -1,0 +1,695 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+  <title>Paper Shan Shui - Infinite Chinese Landscape (Paper.js)</title>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+  <!-- Paper.js Library -->
+  <script src="https://unpkg.com/paper@0.12.17/dist/paper-full.min.js"></script>
+
+  <!-- Core Utilities Layer -->
+  <script src="paperjs/prng.js"></script>
+  <script src="paperjs/noise.js"></script>
+  <script src="paperjs/polytools.js"></script>
+  <script src="paperjs/utils.js"></script>
+
+  <!-- Paper.js Rendering Layer -->
+  <script src="paperjs/paper-renderer.js"></script>
+  <script src="paperjs/stroke-renderer.js"></script>
+
+  <!-- Generator Layer -->
+  <script src="paperjs/trees.js"></script>
+  <script src="paperjs/mountains.js"></script>
+  <script src="paperjs/architecture.js"></script>
+  <script src="paperjs/figures.js"></script>
+  <script src="paperjs/water.js"></script>
+
+  <!-- Paper.js Display and Main Logic -->
+  <script>
+    // Paper.js Display Module - adapted from js/display.js
+    var PaperDisplay = {
+      lastScrollX: 0,
+      pFrame: 0,
+
+      xcroll: function (v) {
+        MEM.cursx += v;
+        if (this.needupdate()) {
+          this.update();
+        } else {
+          this.viewupdate();
+        }
+      },
+
+      autoxcroll: function (v) {
+        if (document.getElementById("AUTO_SCROLL").checked) {
+          var directionElement = document.querySelector('input[name="scroll_direction"]:checked');
+          var scrollDirection = directionElement ? directionElement.value : 'right';
+
+          var smoothStep = 2;
+          var totalSteps = Math.abs(v) / smoothStep;
+          var direction = scrollDirection === 'left' ? -1 : 1;
+          var currentStep = 0;
+
+          var self = this;
+          function doSmoothStep() {
+            if (currentStep < totalSteps && document.getElementById("AUTO_SCROLL").checked) {
+              self.xcroll(smoothStep * direction);
+              currentStep++;
+              setTimeout(doSmoothStep, 30);
+            } else if (document.getElementById("AUTO_SCROLL").checked) {
+              setTimeout(function () {
+                self.autoxcroll(v);
+              }, 800);
+            }
+          }
+
+          doSmoothStep();
+        }
+      },
+
+      getElementToggles: function () {
+        return {
+          trees: document.getElementById("ENABLE_TREES") ? document.getElementById("ENABLE_TREES").checked : true,
+          buildings: document.getElementById("ENABLE_BUILDINGS") ? document.getElementById("ENABLE_BUILDINGS").checked : true,
+          boats: document.getElementById("ENABLE_BOATS") ? document.getElementById("ENABLE_BOATS").checked : true,
+          water: document.getElementById("ENABLE_WATER") ? document.getElementById("ENABLE_WATER").checked : true
+        };
+      },
+
+      regenerateLandscape: function () {
+        console.log("Regenerating landscape with element toggles...");
+
+        if (typeof ELEMENT_TOGGLES !== 'undefined') {
+          var toggles = this.getElementToggles();
+          ELEMENT_TOGGLES.trees = toggles.trees;
+          ELEMENT_TOGGLES.buildings = toggles.buildings;
+          ELEMENT_TOGGLES.boats = toggles.boats;
+          ELEMENT_TOGGLES.water = toggles.water;
+        }
+
+        MEM.chunks = [];
+        MEM.paperChunks = [];
+        MEM.xmin = 0;
+        MEM.xmax = 0;
+
+        this.update();
+        console.log("Landscape regenerated with new element settings");
+      },
+
+      needupdate: function () {
+        return true;
+      },
+
+      viewupdate: function () {
+        // Update Paper.js view
+        if (paper && paper.view) {
+          paper.view.center = new paper.Point(MEM.cursx + MEM.windx / 2, MEM.windy / 2);
+          paper.view.draw();
+        }
+      },
+
+      update: function () {
+
+
+        PaperMain.chunkloader(MEM.cursx, MEM.cursx + MEM.windx);
+        PaperMain.chunkrender(MEM.cursx, MEM.cursx + MEM.windx);
+
+        // Clear and redraw Paper.js canvas
+        if (paper && paper.project) {
+          paper.project.clear();
+
+          // Add all rendered chunks to the Paper.js project
+          for (var i = 0; i < MEM.paperChunks.length; i++) {
+            if (MEM.paperChunks[i].group &&
+              MEM.cursx - MEM.cwid < MEM.paperChunks[i].x &&
+              MEM.paperChunks[i].x < MEM.cursx + MEM.windx + MEM.cwid) {
+              paper.project.activeLayer.addChild(MEM.paperChunks[i].group);
+            }
+          }
+
+          paper.view.draw();
+        }
+      },
+
+      present: function () {
+        var self = this;
+        var currScrollX = window.scrollX;
+        var step = 1;
+        document.body.scrollTo(Math.max(0, this.pFrame - 10), window.scrollY);
+
+        this.pFrame += step;
+
+        if (this.pFrame < 20 || Math.abs(this.lastScrollX - currScrollX) < step * 2) {
+          this.lastScrollX = currScrollX;
+          setTimeout(function () { self.present(); }, 1);
+        }
+      }
+    };
+  </script>
+
+  <!-- Paper.js Main Logic -->
+  <script>
+    // Paper.js Main Module - adapted from js/main.js
+    var PaperMain = {
+
+      chunkloader: function (xmin, xmax) {
+        var self = this;
+        var add = function (nch) {
+          if (MEM.paperChunks.length == 0) {
+            MEM.paperChunks.push(nch);
+            return;
+          } else {
+            if (nch.y <= MEM.paperChunks[0].y) {
+              MEM.paperChunks.unshift(nch);
+              return;
+            } else if (nch.y >= MEM.paperChunks[MEM.paperChunks.length - 1].y) {
+              MEM.paperChunks.push(nch);
+              return;
+            } else {
+              for (var j = 0; j < MEM.paperChunks.length - 1; j++) {
+                if (MEM.paperChunks[j].y <= nch.y && nch.y <= MEM.paperChunks[j + 1].y) {
+                  MEM.paperChunks.splice(j + 1, 0, nch);
+                  return;
+                }
+              }
+            }
+          }
+          console.log("EH?WTF!");
+          console.log(MEM.paperChunks);
+          console.log(nch);
+        };
+
+        while (xmax > MEM.xmax - MEM.cwid || xmin < MEM.xmin + MEM.cwid) {
+          console.log("generating new chunk...");
+
+          var plan;
+          if (xmax > MEM.xmax - MEM.cwid) {
+            plan = self.mountplanner(MEM.xmax, MEM.xmax + MEM.cwid);
+            MEM.xmax = MEM.xmax + MEM.cwid;
+          } else {
+            plan = self.mountplanner(MEM.xmin - MEM.cwid, MEM.xmin);
+            MEM.xmin = MEM.xmin - MEM.cwid;
+          }
+
+          var toggles = PaperDisplay.getElementToggles();
+
+          for (var i = 0; i < plan.length; i++) {
+            if (plan[i].tag == "mount") {
+              add({
+                tag: plan[i].tag,
+                x: plan[i].x,
+                y: plan[i].y,
+                group: Mount.mountain(plan[i].x, plan[i].y, i * 2 * Math.random(), { veg: true })
+              });
+              if (toggles.water) {
+                add({
+                  tag: plan[i].tag,
+                  x: plan[i].x,
+                  y: plan[i].y - 10000,
+                  group: water(plan[i].x, plan[i].y, i * 2)
+                });
+              }
+            } else if (plan[i].tag == "flatmount") {
+              add({
+                tag: plan[i].tag,
+                x: plan[i].x,
+                y: plan[i].y,
+                group: Mount.flatMount(plan[i].x, plan[i].y, 2 * Math.random() * Math.PI, {
+                  wid: 600 + Math.random() * 400,
+                  hei: 100,
+                  cho: 0.5 + Math.random() * 0.2
+                })
+              });
+            } else if (plan[i].tag == "distmount") {
+              add({
+                tag: plan[i].tag,
+                x: plan[i].x,
+                y: plan[i].y,
+                group: Mount.distMount(plan[i].x, plan[i].y, Math.random() * 100, {
+                  hei: 150,
+                  len: randChoice([500, 1000, 1500])
+                })
+              });
+            } else if (plan[i].tag == "boat" && toggles.boats) {
+              add({
+                tag: plan[i].tag,
+                x: plan[i].x,
+                y: plan[i].y,
+                group: Arch.boat01(plan[i].x, plan[i].y, Math.random(), {
+                  sca: plan[i].y / 800,
+                  fli: randChoice([true, false])
+                })
+              });
+            }
+          }
+        }
+      },
+
+      chunkrender: function (xmin, xmax) {
+        // Paper.js rendering is handled by adding groups to the project
+        // This is done in the update function
+      },
+
+      mountplanner: function (xmin, xmax) {
+        function locmax(x, y, f, r) {
+          var z0 = f(x, y);
+          if (z0 <= 0.3) {
+            return false;
+          }
+          for (var i = x - r; i < x + r; i++) {
+            for (var j = y - r; j < y + r; j++) {
+              if (f(i, j) > z0) {
+                return false;
+              }
+            }
+          }
+          return true;
+        }
+
+        function chadd(r, mind) {
+          mind = mind == undefined ? 10 : mind;
+          for (var k = 0; k < reg.length; k++) {
+            if (Math.abs(reg[k].x - r.x) < mind) {
+              return false;
+            }
+          }
+          console.log("+");
+          reg.push(r);
+          return true;
+        }
+
+        var reg = [];
+        var samp = 0.03;
+        var ns = function (x, y) {
+          return Math.max(Noise.noise(x * samp) - 0.55, 0) * 2;
+        };
+        var nns = function (x) {
+          return 1 - Noise.noise(x * samp);
+        };
+        var nnns = function (x, y) {
+          return Math.max(Noise.noise(x * samp * 2, 2) - 0.55, 0) * 2;
+        };
+        var yr = function (x) {
+          return Noise.noise(x * 0.01, Math.PI);
+        };
+
+        var xstep = 5;
+        var mwid = 200;
+        for (var i = xmin; i < xmax; i += xstep) {
+          var i1 = Math.floor(i / xstep);
+          MEM.planmtx[i1] = MEM.planmtx[i1] || 0;
+        }
+
+        for (var i = xmin; i < xmax; i += xstep) {
+          for (var j = 0; j < yr(i) * 480; j += 30) {
+            if (locmax(i, j, ns, 2)) {
+              var xof = i + 2 * (Math.random() - 0.5) * 500;
+              var yof = j + 300;
+              var r = { tag: "mount", x: xof, y: yof, h: ns(i, j) };
+              var res = chadd(r);
+              if (res) {
+                for (var k = Math.floor((xof - mwid) / xstep); k < (xof + mwid) / xstep; k++) {
+                  MEM.planmtx[k] += 1;
+                }
+              }
+            }
+          }
+          if (Math.abs(i) % 1000 < Math.max(1, xstep - 1)) {
+            var r = {
+              tag: "distmount",
+              x: i,
+              y: 280 - Math.random() * 50,
+              h: ns(i, j)
+            };
+            chadd(r);
+          }
+        }
+
+        console.log([xmin, xmax]);
+        for (var i = xmin; i < xmax; i += xstep) {
+          if (MEM.planmtx[Math.floor(i / xstep)] == 0) {
+            if (Math.random() < 0.01) {
+              for (var j = 0; j < 4 * Math.random(); j++) {
+                var r = {
+                  tag: "flatmount",
+                  x: i + 2 * (Math.random() - 0.5) * 700,
+                  y: 700 - j * 50,
+                  h: ns(i, j)
+                };
+                chadd(r);
+              }
+            }
+          }
+        }
+
+        for (var i = xmin; i < xmax; i += xstep) {
+          if (Math.random() < 0.2) {
+            var r = { tag: "boat", x: i, y: 300 + Math.random() * 390 };
+            chadd(r, 400);
+          }
+        }
+
+        return reg;
+      }
+    };
+  </script>
+
+  <!-- Global Variables and Initialization -->
+  <script>
+    // Global variables needed by HTML elements
+    var btnHoverCol = "rgba(0,0,0,0.1)";
+
+    // Initialize seed and parse URL parameters
+    var SEED = "" + new Date().getTime();
+
+    function parseArgs(key2f) {
+      var par = window.location.href.split("?")[1];
+      if (par == undefined) {
+        return;
+      }
+      par = par.split("&");
+      for (var i = 0; i < par.length; i++) {
+        var e = par[i].split("=");
+        try {
+          key2f[e[0]](e[1]);
+        } catch (e) {
+          console.log(e);
+        }
+      }
+    }
+
+    parseArgs({
+      seed: function (x) {
+        SEED = x == "" ? SEED : x;
+      },
+    });
+    Math.seed(SEED);
+    console.log(Prng.seed);
+
+    // Global memory object for application state - adapted for Paper.js
+    var MEM = {
+      paperChunks: [], // Paper.js groups instead of SVG canvas
+      chunks: [], // Keep for compatibility
+      canv: "", // Keep for compatibility
+      xmin: 0,
+      xmax: 0,
+      cwid: 512,
+      cursx: 0,
+      lasttick: 0,
+      windx: 3000,
+      windy: 800,
+      planmtx: []
+    };
+
+    // Global element toggles
+    var ELEMENT_TOGGLES = {
+      trees: true,
+      buildings: true,
+      boats: true,
+      water: true
+    };
+
+    // Global function wrappers for compatibility with original code
+    function water(xoff, yoff, seed, args) {
+      return Water.water(xoff, yoff, seed, args);
+    }
+  </script>
+</head>
+
+<body style="margin:0; padding:0; overflow:hidden; width:100vw; height:100vh;">
+  <div id="SETTING" style="
+    position:fixed; 
+    z-index:1000; 
+    left: 40; 
+    top: 3;
+    ">
+    <div id="SET_BTN" style="
+      width:32;
+      height:32;
+      color:rgba(0,0,0,0.4);
+      border: 1px solid rgba(0,0,0,0.4);
+      text-align: center;
+      display: table;
+      cursor: pointer;
+      " onmouseover="document.getElementById('SET_BTN').style.backgroundColor=btnHoverCol"
+      onmouseout="document.getElementById('SET_BTN').style.backgroundColor='rgba(0,0,0,0)'"
+      onclick="toggleVisible('MENU');toggleText('SET_BTN.t','&#x2630;','&#x2715;')" title="Settings">
+      <div style="display:table-cell; vertical-align: middle;">
+        <font id="SET_BTN.t" size="4px"> &#x2630; </font>
+      </div>
+      <script>
+        window.addEventListener("scroll", function (e) {
+          document.getElementById("SETTING").style.left = Math.max(
+            4,
+            40 - window.scrollX
+          );
+        });
+      </script>
+    </div>
+    <div style="height:4px"></div>
+    <div id="MENU" style="
+      display:none;
+      background-color: rgba(0,0,0,0.1);
+      border: 1px solid rgba(0,0,0,0.4);
+      ">
+      <table>
+        <tr>
+          <td>
+            <pre>SEED</pre>
+          </td>
+        </tr>
+        <tr>
+          <td>
+            <input title="random seed" id="INP_SEED" placeholder="Leave empty for random" />
+            <button onclick="reloadWSeed(document.getElementById('INP_SEED').value)"
+              title="Generate new landscape with seed (leave empty for random)">
+              Generate
+            </button>
+          </td>
+        </tr>
+
+
+        <tr>
+          <td>
+            <pre>ELEMENTS</pre>
+          </td>
+        </tr>
+        <tr>
+          <td>
+            <label style="font-size: 11px; display: block; margin: 2px 0;">
+              <input type="checkbox" id="ENABLE_TREES" checked> 🌲 Trees
+            </label>
+            <label style="font-size: 11px; display: block; margin: 2px 0;">
+              <input type="checkbox" id="ENABLE_BUILDINGS" checked> 🏠 Buildings
+            </label>
+            <label style="font-size: 11px; display: block; margin: 2px 0;">
+              <input type="checkbox" id="ENABLE_BOATS" checked> ⛵ Boats
+            </label>
+            <label style="font-size: 11px; display: block; margin: 2px 0;">
+              <input type="checkbox" id="ENABLE_WATER" checked> 💧 Water
+            </label>
+          </td>
+        </tr>
+        <tr>
+          <td>
+            <pre>STYLE</pre>
+          </td>
+        </tr>
+        <tr>
+          <td>
+            <label style="font-size: 11px; display: block; margin: 2px 0;">
+              <input type="checkbox" id="BROKEN_STROKES"> 🖌️ Broken Strokes
+            </label>
+          </td>
+        </tr>
+        <tr>
+          <td>
+            <button onclick="PaperDisplay.regenerateLandscape()" style="font-size: 11px; padding: 4px 8px;">
+              🔄 Apply Changes
+            </button>
+          </td>
+        </tr>
+
+
+      </table>
+    </div>
+  </div>
+
+  <!-- Main landscape area - Paper.js Canvas -->
+  <div id="BG" style="position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; overflow: hidden;">
+    <canvas id="paperCanvas" style="display: block; width: 100%; height: 100%;"></canvas>
+    <script>
+      function initializePaperLandscape() {
+        console.log("Paper.js BG initialization starting...");
+
+        try {
+          // Initialize Paper.js
+          paper.setup('paperCanvas');
+
+          // Set canvas size to full viewport
+          var viewWidth = window.innerWidth;
+          var viewHeight = window.innerHeight;
+          paper.view.viewSize = new paper.Size(viewWidth, viewHeight);
+
+          // Update MEM dimensions to match viewport
+          MEM.windx = viewWidth;
+          MEM.windy = viewHeight;
+
+          console.log("Canvas set to viewport size:", viewWidth, "x", viewHeight);
+
+          // Disable mouse drag panning - only wheel scrolling enabled
+          console.log("Mouse drag panning disabled - wheel scrolling only");
+
+          // Add mouse wheel horizontal panning
+          var canvas = document.getElementById('paperCanvas');
+          canvas.addEventListener('wheel', function(event) {
+            event.preventDefault(); // Prevent default scroll behavior
+            
+            // Use deltaY for horizontal panning (scroll wheel up/down becomes left/right)
+            var panAmount = event.deltaY * 2; // Multiply for more responsive panning
+            
+            // Move the view center horizontally
+            paper.view.center = paper.view.center.add(new paper.Point(panAmount, 0));
+            
+            // Update MEM.cursx to track position
+            MEM.cursx = paper.view.center.x - MEM.windx / 2;
+            
+            // Debounce chunk updates to avoid too frequent generation
+            clearTimeout(PaperDisplay.wheelUpdateTimer);
+            PaperDisplay.wheelUpdateTimer = setTimeout(function() {
+              PaperDisplay.update();
+            }, 300);
+          });
+
+          // Handle window resize
+          window.addEventListener('resize', function () {
+            var newWidth = window.innerWidth;
+            var newHeight = window.innerHeight;
+            paper.view.viewSize = new paper.Size(newWidth, newHeight);
+            MEM.windx = newWidth;
+            MEM.windy = newHeight;
+            console.log("Canvas resized to:", newWidth, "x", newHeight);
+          });
+
+          // Initialize application inline to ensure proper timing
+          MEM.lasttick = new Date().getTime();
+
+          // Set seed input value if element exists
+          var seedInput = document.getElementById("INP_SEED");
+          if (seedInput) {
+            seedInput.value = SEED;
+          }
+
+          console.log("MEM initialized, windx:", MEM.windx, "windy:", MEM.windy);
+          console.log("MEM state:", { xmin: MEM.xmin, xmax: MEM.xmax, cursx: MEM.cursx });
+
+
+
+          // Force initial chunk generation
+          console.log("Force generating initial chunks...");
+
+          // Reset chunk state to ensure clean start
+          MEM.paperChunks = [];
+          MEM.chunks = [];
+          MEM.canv = "";
+
+          // Generate chunks for initial view
+          var xmin = MEM.cursx;
+          var xmax = MEM.cursx + MEM.windx;
+          console.log("Generating chunks for range:", xmin, "to", xmax);
+
+          PaperMain.chunkloader(xmin, xmax);
+          console.log("Chunkloader completed, chunks:", MEM.paperChunks.length);
+
+          PaperMain.chunkrender(xmin, xmax);
+          console.log("Chunkrender completed");
+
+          // Update the display
+          PaperDisplay.update();
+
+          document.body.scrollTo(0, 0);
+          console.log("Scroll position reset");
+
+          console.log("Calling present()...");
+          PaperDisplay.present();
+
+          console.log("Paper.js BG initialization completed!");
+
+
+
+        } catch (error) {
+          console.error("Error in Paper.js BG initialization:", error);
+          var bgElement = document.getElementById("BG");
+          if (bgElement) {
+            bgElement.innerHTML =
+              "<div style='padding: 50px; text-align: center; color: #f00;'>" +
+              "<h3>Paper.js Initialization Error</h3>" +
+              "<p>Error: " + error.message + "</p>" +
+              "<p>Check the browser console for more details.</p>" +
+              "</div>";
+          }
+        }
+      }
+
+      // Wait for DOM to be fully loaded before initializing
+      if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', initializePaperLandscape);
+      } else {
+        // DOM is already loaded
+        setTimeout(initializePaperLandscape, 100);
+      }
+
+      // Fallback initialization after a longer delay
+      setTimeout(function () {
+        if (typeof MEM !== 'undefined' && MEM.paperChunks.length === 0) {
+          console.log("Fallback initialization triggered");
+          initializePaperLandscape();
+        }
+      }, 1000);
+    </script>
+  </div>
+
+
+  </div>
+
+  <!-- Utility Functions -->
+  <script>
+
+
+    function toggleVisible(id) {
+      var v = document.getElementById(id).style.display == "none";
+      document.getElementById(id).style.display = v ? "block" : "none";
+    }
+
+    function toggleText(id, a, b) {
+      var v = document.getElementById(id).innerHTML;
+      document.getElementById(id).innerHTML = v == "" || v == b ? a : b;
+    }
+
+    function reloadWSeed(s) {
+      var u = window.location.href.split("?")[0];
+      if (s === "" || s === undefined || s === null) {
+        s = "" + new Date().getTime();
+      }
+      window.location.href = u + "?seed=" + s;
+    }
+
+
+
+
+
+
+  </script>
+
+  <!-- White Background -->
+  <script>
+    setTimeout(function () {
+      document.getElementsByTagName("body")[0].style.backgroundColor = "white";
+    }, 100);
+  </script>
+
+</body>
+
+</html>
